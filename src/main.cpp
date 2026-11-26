@@ -20,8 +20,6 @@ int main() {
         getline(cin, command);
 
         // parse your commands however you see fit
-        if (!compass.ParseCommand(command)) {
-            cout << "BAD PARSE";
-        }
+        cout << compass.ParseCommand(command) << endl;
     }
 }

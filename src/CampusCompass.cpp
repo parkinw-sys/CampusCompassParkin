@@ -2,7 +2,10 @@
 
 #include <string>
 #include <iostream>
-#include <map>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
+#include <regex>
 
 using namespace std;
 
@@ -11,92 +14,176 @@ CampusCompass::CampusCompass() {
     this->student_info = {};
     this->loc_name = {};
     this->classes = {};
+
 }
 
 bool CampusCompass::ParseCSV(const string &edges_filepath, const string &classes_filepath) {
-    // return boolean based on whether parsing was successful or not
+    ifstream edges(edges_filepath);
+    if (!edges.is_open()) {
+        return false;
+    }
+    string line;
+    while (getline(edges, line)) {
+        if (line.at(0) == 'L') {
+            continue; // skip the header
+        }
+        vector<string> row;
+        stringstream ss(line);
+        string value;
+        while (getline(ss, value, ',')) {
+            row.push_back(value);
+        }
+        int loc1 = stoi(row[0]);
+        int loc2 = stoi(row[1]);
+        int time = stoi(row[4]);
+        loc_name[loc1] = row[2];
+        loc_name[loc2] = row[3];
+        graph[loc1].emplace_back(make_pair(loc2, make_pair(time, false)));
+        graph[loc2].emplace_back(make_pair(loc1, make_pair(time, false)));
+    }
+    ifstream classy(classes_filepath);
+    if (!classy.is_open()) {
+        return false;
+    }
+    while (getline(classy, line)) {
+        if (line.at(0) == 'C') {
+            continue; // skip the header
+        }
+        vector<string> row;
+        stringstream ss(line);
+        string value;
+        while (getline(ss, value, ',')) {
+            row.push_back(value);
+        }
+        int location = stoi(row[1]);
+        classes[row[0]].second = location;
+    }
     return true;
 }
 
-bool CampusCompass::ParseCommand(const string &command) {
+string CampusCompass::ParseCommand(const string &command) {
+    string result = "unsuccessful";
     // do whatever regex you need to parse validity
-    // hint: return a boolean for validation when testing. For example:
-    bool is_valid = true; // replace with your actual validity checking
-
-    return is_valid;
-}
-
-void CampusCompass::insert(const string& name, const int& id, const int& home_id, const vector<string>& classes_taking)  {
-    if (!student_info.count(id)) { // making sure the student is unique
-        student_info[id] = make_pair(name, home_id);
-        for (string class_code : classes_taking) {
-            if (classes.count(class_code)) {
-                classes[class_code].first.insert(id); // add student to that class
-                student_schedule[id].insert(class_code); // add class to that student lol
-            } else {
-                cout << "unsuccessful" << endl;
-                //return; maybe?
+    try {
+        stringstream args(command);
+        string main;
+        args >> main;
+        if (main == "insert") { // no i will not use regex for this its a waste of time
+            string name;
+            string ufidS;
+            string home_idS;
+            string n;
+            args >> quoted(name) >> ufidS >> home_idS >> n;
+            if (validateName(name) && validateUFID(ufidS)) {
+                vector<string> class_codes;
+                string value;
+                int count = 0;
+                while (getline(args, value, ' ')) {
+                    if (validateClass(value)) {
+                        count++;
+                        class_codes.push_back(value);
+                    }
+                }
+                if (count == stoi(n) && this->insert(name, stoi(ufidS), stoi(home_idS), class_codes)) {
+                    result = "successful";
+                }
             }
+        } else if (main == "remove") {
+
+        } else if (main == "dropClass") {
+
+        } else if (main == "replaceClass") {
+
+        } else if (main == "removeClass") {
+
+        } else if (main == "toggleEdgesClosure") {
+
+        } else if (main == "checkEdgeStatus") {
+
+        } else if (main == "isConnected") {
+
+        } else if (main == "printShortestEdges") {
+
+        } else if (main == "printStudentZone") {
+
         }
-    } else {
-        cout << "unsuccessful" << endl;
+    } catch (const exception& e) {
+        cerr << "remember to remove this, but error: " << endl << e.what() << endl;;
+
     }
+    return result;
 }
 
-void CampusCompass::remove(const int& id) {
-    if (student_info.count(id)) {
-        unordered_set<string> schedule = student_schedule[id];
-        for (string class_code : schedule) { // removing student from all of their classes. if empty, just skips
-            dropClass(id, class_code);
-        }
-        cout << "succesful" << endl;
-    } else {
-        cout << "unsuccessful" << endl;
+bool CampusCompass::insert(const string& name, const int& ufid, const int& home_id, const vector<string>& classes_taking)  {
+    if (student_info.count(ufid)) {// making sure the student is unique
+        return false;
     }
-}
-
-void CampusCompass::dropClass(const int& id, const string& class_code) {
-    if (student_schedule.count(id) && student_schedule[id].count(class_code) && classes.count(class_code) && classes[class_code].first.count(id)) {
-        classes[class_code].first.erase(id);
-        student_schedule[id].erase(class_code);
-        if (student_schedule[id].empty()) {
-            student_schedule.erase(id);
-            student_info.erase(id); // erasing the student's entry itself
+    student_info[ufid] = make_pair(name, home_id);
+    for (string class_code : classes_taking) {
+        if (classes.count(class_code)) {
+            classes[class_code].first.insert(ufid); // add student to that class
+            student_schedule[ufid].insert(class_code); // add class to that student lol
+        } else {
+            return false;
         }
-        cout << "succesful" << endl; // def going to be issues with too many couts
     }
-    cout << "unsuccessful" << endl;
+    return true;
 
 }
-void CampusCompass::addClass(const int& id, const string& class_code) {
-    if (student_schedule.count(id) && !student_schedule[id].count(class_code) && classes.count(class_code) && !classes[class_code].first.count(id)) {
+
+bool CampusCompass::remove(const int& ufid) {
+    if (!student_info.count(ufid)) {
+        return false;
+    }
+    unordered_set<string> schedule = student_schedule[ufid];
+    for (string class_code : schedule) { // removing student from all of their classes. if empty, just skips
+        if (!dropClass(ufid, class_code)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool CampusCompass::dropClass(const int& ufid, const string& class_code) {
+    if (student_schedule.count(ufid) && student_schedule[ufid].count(class_code) && classes.count(class_code) && classes[class_code].first.count(ufid)) {
+        classes[class_code].first.erase(ufid);
+        student_schedule[ufid].erase(class_code);
+        if (student_schedule[ufid].empty()) {
+            student_schedule.erase(ufid);
+            student_info.erase(ufid); // erasing the student's entry itself
+        }
+        return true;
+    }
+    return false;
+
+}
+bool CampusCompass::addClass(const int& id, const string& class_code) { // add a class to a student's schedule (and that student to the classes roster)
+    if (student_schedule.count(id) && !student_schedule[id].count(class_code) && classes.count(class_code) && !classes[class_code].first.count(id) && student_schedule[id].size() < 6) {
         classes[class_code].first.insert(id); // add student to that class
         student_schedule[id].insert(class_code); // add class to that student
-        cout << "successful" << endl;
+        return true;
     } else {
-        cout << "unsuccessful" << endl;
+        return false;
     }
 }
 
-void CampusCompass::replaceClass(const int& id, const string& class_to_remove, const string& class_to_add) {
-    if (student_info.count(id)) {
-        this->dropClass(id, class_to_remove);
-        this->addClass(id, class_to_add);
-    } else {
-        cout << "unsuccessful" << endl;
+bool CampusCompass::replaceClass(const int& ufid, const string& class_to_remove, const string& class_to_add) {
+    if (!student_info.count(ufid)) {
+        return false;
     }
+    return this->dropClass(ufid, class_to_remove) && this->addClass(ufid, class_to_add);
 }
 
-void CampusCompass::removeClass(const string& class_code) {
-    if (classes.count(class_code) && !classes[class_code].first.empty()) {
-        cout << classes[class_code].first.size() << endl;
-        for (int id : classes[class_code].first) {
-            student_schedule[id].erase(class_code);
-        }
-        classes[class_code].first.clear();
-    } else {
-        cout << "unsuccessful" << endl;
+bool CampusCompass::removeClass(const string& class_code) {
+    if (!classes.count(class_code) || classes[class_code].first.empty()) {
+        return false;
     }
+    cout << classes[class_code].first.size() << endl;
+    for (int id : classes[class_code].first) {
+        student_schedule[id].erase(class_code);
+    }
+    classes[class_code].first.clear();
+    return true;
 }
 
 void CampusCompass::toggleEdges(const vector<pair<int, int>>& edges) { // always given valid edges, and i hope not duplicates
@@ -125,15 +212,42 @@ bool CampusCompass::isConnected(const int& id_a, const int& id_b) {
     return false;
 }
 
-vector<pair<int,int>> CampusCompass::getShortestEdges(const int& student_id) {
+vector<pair<int,int>> CampusCompass::getShortestEdges(const int& ufid) {
     vector<pair<int,int>> edges = {};
     return edges;
 }
 
-void CampusCompass::printShortestEdges(const int& student_id) {
+bool CampusCompass::validateUFID(const string& ufid) { // only for use when inserting a new student, because it contains uniqueness
+    try {
+        regex reg = regex("[0-9]{8}");
+        return regex_match(ufid, reg) && !this->student_info.count(stoi(ufid));
+    } catch (const exception& e) {
+        return false;
+    }
+}
+
+bool CampusCompass::validateName(const string& name) {
+    try {
+        regex reg = regex("[A-Za-z ]*");
+        return regex_match(name, reg);
+    } catch (const exception& e) {
+        return false;
+    }
+}
+
+bool CampusCompass::validateClass(const string& class_code) {
+    try {
+        regex reg = regex("[A-Z]{3}[0-9]{4}");
+        return regex_match(class_code, reg);
+    } catch (const exception& e) {
+        return false;
+    }
+}
+
+void CampusCompass::printShortestEdges(const int& ufid) {
 
 }
 
-int CampusCompass::printStudentzone(const int& student_id) {
+int CampusCompass::printStudentzone(const int& ufid) {
     return 0;
 }
