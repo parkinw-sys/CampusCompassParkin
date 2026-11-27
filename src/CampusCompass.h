@@ -19,21 +19,21 @@ private:
 
     bool addClass(const int& id, const string& class_code);
     vector<pair<int,int>> getShortestEdges(const int& ufid); // returns the edges, dijkstras
-
-public:
     bool validateUFID(const string& ufid);
+    bool validateRegistered(const string& ufid);
     bool validateName(const string& name); // helper regex functions, for the simple ones on canvas
     bool validateClass(const string& class_code);
+
+public:
     bool insert(const string& name, const int& ufid, const int& home_id, const vector<string>& classes_taking);
     bool remove(const int& ufid);
     bool dropClass(const int& ufid, const string& class_code);
     bool replaceClass(const int& ufid, const string& class_to_remove, const string& class_to_add);
-    bool removeClass(const string& class_code);
-    void toggleEdges(const vector<pair<int, int>>& edges);
+    int removeClass(const string& class_code);
+    bool toggleEdges(const vector<pair<int, int>>& edges);
     int checkEdgeBad(const int& id_a, const int& id_b); // -1 dne, 0 open, 1 closed. if doing boolean, -1 does mean true, so beware
     bool isConnected(const int& id_a, const int& id_b);
     void printShortestEdges(const int& ufid);
-
     int printStudentzone(const int& ufid); // prints MST cost, probably kruskals?
 
     // maybe we use actual error throwing thats caught in main for stuff like this, hmmmmm so i dont need to like pass along "all good" values. maybe a good idea to pass along anyways

@@ -82,3 +82,51 @@ unsuccessful
 
   REQUIRE(actualOutput == expectedOutput);
 }
+
+TEST_CASE("CSV Parsing", "[flag]") {
+  CampusCompass a;
+  REQUIRE(a.ParseCSV("../data/edges.csv", "../data/classes.csv"));
+  REQUIRE(!a.checkEdgeBad(4,5));
+  REQUIRE(a.checkEdgeBad(6,6));
+}
+
+TEST_CASE("Simple Commands", "[flag]") {
+  CampusCompass c;
+  REQUIRE(c.ParseCSV("../data/edges.csv", "../data/classes.csv"));
+  REQUIRE(c.insert("Will P", 12345678, 50,{"COP3503", "CEN3031", "MAC2312"}));
+  SECTION("remove") {
+    REQUIRE(c.remove(12345678)); // now, we can insert someone with that ufid no problem
+    REQUIRE(c.insert("Will P", 12345678, 50,{"COP3503", "CEN3031", "MAC2312"}));
+  }
+  SECTION("dropClass") {
+    REQUIRE(c.dropClass(12345678, "CEN3031"));
+    REQUIRE(!c.dropClass(12345678, "CEN3031")); // can't drop it again
+  }
+  SECTION("replaceClass") {
+    REQUIRE(c.replaceClass(12345678, "MAC2312", "PHY2048"));
+    REQUIRE(c.replaceClass(12345678, "PHY2048", "MAC2312")); // should be able to switch back
+  }
+  SECTION("removeClass") {
+    REQUIRE(c.removeClass("COP3503") == 1);
+    REQUIRE(c.removeClass("COP3503") == -1);  // can't do it again
+  }
+  SECTION("toggleEdgesClosure") {
+    REQUIRE(c.toggleEdges({make_pair(3,4), make_pair(6,3), make_pair(6,43)}));
+    REQUIRE(c.checkEdgeBad(4,3));
+    REQUIRE(c.checkEdgeBad(3,6)); // edges should be "bad"
+    REQUIRE(c.checkEdgeBad(43,6));
+  }
+  SECTION("checkEdgeStatus") {
+    REQUIRE(!c.checkEdgeBad(20,8));
+  }
+}
+
+TEST_CASE("Command Parsing") {
+  CampusCompass c;
+  REQUIRE(c.ParseCSV("../data/edges.csv", "../data/classes.csv"));
+  string insert = R"(insert "Will P" 12345678 50 3 COP3503 CEN3031 MAC2312)";
+  string insertActual = c.ParseCommand(insert);
+  string insertExpected = R"(successful)";
+  REQUIRE(insertActual == insertExpected);
+
+}

@@ -46,7 +46,7 @@ bool CampusCompass::ParseCSV(const string &edges_filepath, const string &classes
         return false;
     }
     while (getline(classy, line)) {
-        if (line.at(0) == 'C') {
+        if (line.at(1) == 'l') {
             continue; // skip the header
         }
         vector<string> row;
@@ -74,7 +74,7 @@ string CampusCompass::ParseCommand(const string &command) {
             string home_idS;
             string n;
             args >> quoted(name) >> ufidS >> home_idS >> n;
-            if (validateName(name) && validateUFID(ufidS)) {
+            if (validateName(name) && validateUFID(ufidS) && !validateRegistered(ufidS)) {
                 vector<string> class_codes;
                 string value;
                 int count = 0;
@@ -89,7 +89,11 @@ string CampusCompass::ParseCommand(const string &command) {
                 }
             }
         } else if (main == "remove") {
-
+            string ufidS;
+            args >> ufidS;
+            if (validateUFID(ufidS) && validateRegistered(ufidS) && this->remove(stoi(ufidS))) {
+                result = "successful";
+            }
         } else if (main == "dropClass") {
 
         } else if (main == "replaceClass") {
@@ -174,38 +178,45 @@ bool CampusCompass::replaceClass(const int& ufid, const string& class_to_remove,
     return this->dropClass(ufid, class_to_remove) && this->addClass(ufid, class_to_add);
 }
 
-bool CampusCompass::removeClass(const string& class_code) {
+int CampusCompass::removeClass(const string& class_code) {
     if (!classes.count(class_code) || classes[class_code].first.empty()) {
-        return false;
+        return -1;
     }
-    cout << classes[class_code].first.size() << endl;
+    int num = classes[class_code].first.size();
     for (int id : classes[class_code].first) {
         student_schedule[id].erase(class_code);
     }
     classes[class_code].first.clear();
-    return true;
+    return num;
 }
 
-void CampusCompass::toggleEdges(const vector<pair<int, int>>& edges) { // always given valid edges, and i hope not duplicates
+bool CampusCompass::toggleEdges(const vector<pair<int, int>>& edges) { // always given valid edges, and i hope not duplicates
     for (auto [fst, snd] : edges) {
-        for (auto i : graph[fst]) { // sets don't really work :C
+        for (auto& i : graph[fst]) { // sets don't really work :C
             if (i.first == snd) {
                 i.second.second = !i.second.second;
                 break;
             }
         }
-        for (auto i : graph[snd]) {
+        for (auto& i : graph[snd]) {
             if (i.first == fst) {
                 i.second.second = !i.second.second;
                 break;
             }
         }
     }
-    cout << "successful" << endl;
+    return true;
 }
 
 int CampusCompass::checkEdgeBad(const int& id_a, const int& id_b) { // -1 dne, 0 open, 1 closed
-    return 1;
+    if (graph.count(id_a)) {
+        for (auto edge : graph[id_a]) {
+            if (edge.first == id_b) {
+                return edge.second.second;
+            }
+        }
+    }
+    return -1;
 }
 
 bool CampusCompass::isConnected(const int& id_a, const int& id_b) {
@@ -220,7 +231,15 @@ vector<pair<int,int>> CampusCompass::getShortestEdges(const int& ufid) {
 bool CampusCompass::validateUFID(const string& ufid) { // only for use when inserting a new student, because it contains uniqueness
     try {
         regex reg = regex("[0-9]{8}");
-        return regex_match(ufid, reg) && !this->student_info.count(stoi(ufid));
+        return regex_match(ufid, reg);
+    } catch (const exception& e) {
+        return false;
+    }
+}
+
+bool CampusCompass::validateRegistered(const string& ufid) {
+    try {
+        return this->student_info.count(stoi(ufid));
     } catch (const exception& e) {
         return false;
     }
