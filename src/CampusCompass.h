@@ -6,12 +6,36 @@
 #include <unordered_set>
 
 using namespace std;
+struct EdgeInfo {
+    int to;
+    int time;
+    bool mutable closed;
 
+    EdgeInfo(int to_, int time_ = 0) {
+        to = to_;
+        time = time_;
+        closed = false;
+    }
+    bool operator==(const EdgeInfo& other) const {
+        return other.to == to;
+    }
+    bool operator<(const EdgeInfo& other) const {
+        return other.to < to;
+    }
+    void toggle() const{
+        closed = !closed;
+    }
+};
+struct EdgeHash {
+    auto operator()(const EdgeInfo& e) const noexcept{
+        return hash<int>{}(e.to); // thank you cppreference
+    }
+};
 class CampusCompass {
 private:
     // Think about what member variables you need to initialize
     // pretty sparse since paths tend to not overlap, so an adjacency list. contains a vector for the "to" vertex, along with the time and a "unwalkable" boolean
-    unordered_map<int, vector<pair<int,pair<int, bool>>>> graph; // make graph from prev data, we dont add or remove nodes/edges. Also remember that these are undirected, and the boolean should be false bc it represents "CLOSED"
+    unordered_map<int, unordered_set<EdgeInfo, EdgeHash>> graph; // make graph from prev data, we dont add or remove nodes/edges. Also remember that these are undirected, and the boolean should be false bc it represents "CLOSED"
     unordered_map<int, pair<string, int>> student_info; // student id to their residence id and name
     unordered_map<int, unordered_set<string>> student_schedule; // student id to set of the classes they are in
     unordered_map<int, string> loc_name; // i freaking love sets and maps
@@ -19,10 +43,11 @@ private:
 
     bool addClass(const int& id, const string& class_code);
     vector<pair<int,int>> getShortestEdges(const int& ufid); // returns the edges, dijkstras
-    bool validateUFID(const string& ufid);
-    bool validateRegistered(const string& ufid);
+    bool validateUFID(const int& ufid);
+    bool validateRegistered(const int& ufid);
     bool validateName(const string& name); // helper regex functions, for the simple ones on canvas
     bool validateClass(const string& class_code);
+    bool validateLocation(const int& loc_id);
 
 public:
     bool insert(const string& name, const int& ufid, const int& home_id, const vector<string>& classes_taking);
